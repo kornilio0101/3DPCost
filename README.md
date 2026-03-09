@@ -1,73 +1,88 @@
-# React + TypeScript + Vite
+# 3DP Cost Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, feature-rich 3D printing cost calculator built with React, TypeScript, and Vite. This tool helps 3D printing enthusiasts and professionals accurately estimate the cost of their prints, including filament, electricity, machine wear, and profit margins.
 
-Currently, two official plugins are available:
+![3DP Cost Calculator](https://raw.githubusercontent.com/kornilio0101/3DPCost/main/public/vite.svg) *Note: Replace with actual screenshot if available*
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
 
-## React Compiler
+- **Filament Library**: Manage your own collection of filaments with custom names, colors, and prices.
+- **Single & Multi-material Support**:
+  - Calculate costs for simple prints.
+  - Multi-material support with per-filament pricing or a global override.
+- **Comprehensive Cost Breakdown**:
+  - **Filament Cost**: Exact usage based on grams.
+  - **Electricity Cost**: Main print power + configurable warmup routine (e.g., bed heating).
+  - **Waste/Purge Cost**: Account for basic waste (5%) and purge blocks (grams per change).
+  - **Machine Deprecation**: Factor in the cost of your machine over its lifespan (default 4000h).
+- **Profit Margin**: Easily add a percentage-based margin to find your final selling price.
+- **Global Currency Support**: Choose from over 20 global currencies (USD, EUR, GBP, JPY, etc.).
+- **Persisted Settings**: All your filaments and settings are saved locally in your browser/app.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Getting Started
 
-## Expanding the ESLint configuration
+### Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Installation
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/kornilio0101/3DPCost.git
+   cd 3DPCost
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+### Development
+
+To run the app in development mode (with Vite HMR and Electron):
+```bash
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Building & Packaging
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+#### Electron Version (Windows)
+To build the production assets and package the app into an executable:
+```bash
+npm run build
+npm run package
 ```
+The output will be in the `release/` folder.
+
+#### Python Version (PyInstaller)
+If you prefer the Python-based `pywebview` version:
+1. Build the frontend:
+   ```bash
+   npm run build
+   ```
+2. Install Python dependencies:
+   ```bash
+   pip install pywebview
+   ```
+3. Create the executable using the provided spec file:
+   ```bash
+   pyinstaller 3DP_Cost_Calculator_v7.spec
+   ```
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React 19, TypeScript, Vite
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Styling**: Modern Vanilla CSS
+- **Desktop Wrapper**: Electron / [pywebview](https://pywebview.flowrl.com/)
+- **Packaging**: Electron Packager / PyInstaller
+
+## 👤 Author
+
+**Kornilio Tribalis**
+- GitHub: [@kornilio0101](https://github.com/kornilio0101)
+
+---
+*Created with ❤ for the 3D Printing Community.*
