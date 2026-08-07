@@ -65,7 +65,7 @@ This project comes with a PyInstaller script to package the web app into a light
    ```
 3. Create the executable using the provided spec file:
    ```bash
-   pyinstaller 3DP_Cost_Calculator_v7.spec --clean
+   pyinstaller 3DP_Cost_Calculator.spec --clean
    ```
 The portable executable will be generated inside the `dist/` folder.
 
