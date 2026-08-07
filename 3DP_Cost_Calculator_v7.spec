@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='3DP_Cost_Calculator_v7',
+    name='3DPCost.exe',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
