@@ -17,6 +17,7 @@ function createWindow() {
         },
         autoHideMenuBar: true,
         backgroundColor: '#0d0d12',
+        icon: path.join(__dirname, 'icon.png'),
     });
 
     // In a packaged Electron app, __dirname is the folder containing this file (resources/app)

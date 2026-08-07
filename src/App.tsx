@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Settings, Package, Plus, Trash2, Zap, Percent, Scale, RefreshCw, Clock, Cpu, Banknote } from 'lucide-react';
+import { Home, Settings, Package, Plus, Trash2, Zap, Percent, Scale, RefreshCw, Clock, Cpu, Banknote, ChevronDown, ChevronRight } from 'lucide-react';
 import './index.css';
 
 // Types
@@ -11,12 +11,24 @@ interface Filament {
 }
 
 interface AppSettings {
-  margin: number;
   electricityCost: number;
-  wattsUsed: number;
   purgeGramsPerChange: number;
-  machinePrice: number;
   currencyCode: string;
+}
+
+interface Printer {
+  id: string;
+  name: string;
+  price: number;
+  printWatts: number;
+  warmupWatts: number;
+  depreciationLife: number;
+}
+
+interface MarginTier {
+  id: string;
+  name: string;
+  margin: number;
 }
 
 interface MultiUsage {
@@ -25,8 +37,8 @@ interface MultiUsage {
 }
 
 const currencies = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
   { code: 'GBP', symbol: '£', name: 'British Pound' },
   { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
@@ -54,16 +66,35 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('appSettings');
     const defaultSettings = {
-      margin: 20,
-      electricityCost: 0.15,
-      wattsUsed: 250,
+      electricityCost: 0.20,
       purgeGramsPerChange: 0.5,
-      machinePrice: 500,
-      currencyCode: 'USD'
+      currencyCode: 'EUR'
     };
     if (!saved) return defaultSettings;
     const parsed = JSON.parse(saved);
+    // Remove old properties if they exist in saved data
+    delete parsed.margin;
+    delete parsed.wattsUsed;
+    delete parsed.machinePrice;
     return { ...defaultSettings, ...parsed };
+  });
+
+  const [printers, setPrinters] = useState<Printer[]>(() => {
+    const saved = localStorage.getItem('printers');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', name: 'Creality K1 Max + CFS', price: 700, printWatts: 200, warmupWatts: 1000, depreciationLife: 3000 },
+      { id: '2', name: 'Bambu Lab A1', price: 259, printWatts: 120, warmupWatts: 1000, depreciationLife: 3000 },
+      { id: '3', name: 'Bambu Lab A1 Mini', price: 189, printWatts: 150, warmupWatts: 300, depreciationLife: 3000 }
+    ];
+  });
+
+  const [marginTiers, setMarginTiers] = useState<MarginTier[]>(() => {
+    const saved = localStorage.getItem('marginTiers');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', name: 'Friends & Family', margin: 10 },
+      { id: '2', name: 'Standard Business', margin: 40 },
+      { id: '3', name: 'Premium (Rush)', margin: 80 }
+    ];
   });
 
   // Filaments State
@@ -86,7 +117,14 @@ const App: React.FC = () => {
   const [changes, setChanges] = useState<number>(0);
   const [selectedFilamentId, setSelectedFilamentId] = useState<string>(filaments[0]?.id || '');
 
+  const [selectedPrinterId, setSelectedPrinterId] = useState<string>(printers[0]?.id || '');
+  const [selectedMarginId, setSelectedMarginId] = useState<string>(marginTiers[0]?.id || '');
+
   const [multiUsage, setMultiUsage] = useState<MultiUsage[]>([]);
+
+  // Collapse States
+  const [printersCollapsed, setPrintersCollapsed] = useState<boolean>(false);
+  const [filamentsCollapsed, setFilamentsCollapsed] = useState<boolean>(false);
 
   // Effects
   useEffect(() => {
@@ -96,6 +134,14 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('filaments', JSON.stringify(filaments));
   }, [filaments]);
+
+  useEffect(() => {
+    localStorage.setItem('printers', JSON.stringify(printers));
+  }, [printers]);
+
+  useEffect(() => {
+    localStorage.setItem('marginTiers', JSON.stringify(marginTiers));
+  }, [marginTiers]);
 
   // Currency helper
   const currencySymbol = currencies.find(c => c.code === settings.currencyCode)?.symbol || '$';
@@ -141,24 +187,28 @@ const App: React.FC = () => {
     const basicWasteCost = baseFilamentPrice * 0.05;
     const totalFilamentRelatedCost = baseFilamentPrice + basicWasteCost + purgeCost;
 
-    // Warm-up Cost (6 mins @ 800W)
-    const warmupEnergyKWh = (6 / 60) * (800 / 1000);
+    // Get Selected Printer and Margin
+    const printer = printers.find(p => p.id === selectedPrinterId) || printers[0] || { price: 500, printWatts: 250, warmupWatts: 800, depreciationLife: 4000 };
+    const marginObj = marginTiers.find(m => m.id === selectedMarginId) || marginTiers[0] || { margin: 20 };
+
+    // Warm-up Cost (6 mins)
+    const warmupEnergyKWh = (6 / 60) * (printer.warmupWatts / 1000);
     const warmupCost = warmupEnergyKWh * settings.electricityCost;
 
     // Electricity Cost
-    const printEnergyKWh = totalTimeHours * (settings.wattsUsed / 1000);
+    const printEnergyKWh = totalTimeHours * (printer.printWatts / 1000);
     const mainElectricityCost = printEnergyKWh * settings.electricityCost;
     const totalElectricityCost = mainElectricityCost + warmupCost;
 
-    // Machine Deprecation Cost (MachinePrice / 4000 hours)
-    const deprecationHourRate = settings.machinePrice / 4000;
+    // Machine Deprecation Cost
+    const deprecationHourRate = printer.price / printer.depreciationLife;
     const deprecationCost = totalTimeHours * deprecationHourRate;
 
     // Total Base Cost
     const totalBaseCost = totalFilamentRelatedCost + totalElectricityCost + deprecationCost;
 
     // Final Price with Margin
-    const finalPrice = totalBaseCost * (1 + settings.margin / 100);
+    const finalPrice = totalBaseCost * (1 + marginObj.margin / 100);
 
     return {
       filamentCost: baseFilamentPrice.toFixed(2),
@@ -191,13 +241,18 @@ const App: React.FC = () => {
   };
 
   const addFilament = () => {
+    const id = Date.now().toString();
     const newFilament: Filament = {
-      id: Date.now().toString(),
+      id,
       name: 'New Filament',
-      color: '#6366f1',
+      color: '#3b82f6',
       pricePerKg: 20
     };
     setFilaments([...filaments, newFilament]);
+    setFilamentsCollapsed(false);
+    setTimeout(() => {
+      document.getElementById(`filament-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
 
   const updateFilament = (id: string, updates: Partial<Filament>) => {
@@ -206,6 +261,56 @@ const App: React.FC = () => {
 
   const deleteFilament = (id: string) => {
     setFilaments(filaments.filter(f => f.id !== id));
+  };
+
+  const addPrinter = () => {
+    const id = Date.now().toString();
+    const newPrinter: Printer = {
+      id,
+      name: 'New Printer',
+      price: 500,
+      printWatts: 150,
+      warmupWatts: 800,
+      depreciationLife: 4000
+    };
+    setPrinters([...printers, newPrinter]);
+    setPrintersCollapsed(false);
+    setTimeout(() => {
+      document.getElementById(`printer-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
+  const updatePrinter = (id: string, updates: Partial<Printer>) => {
+    setPrinters(printers.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
+  const deletePrinter = (id: string) => {
+    setPrinters(printers.filter(p => p.id !== id));
+  };
+
+  const movePrinter = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === printers.length - 1)) return;
+    const newPrinters = [...printers];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    [newPrinters[index], newPrinters[swapIndex]] = [newPrinters[swapIndex], newPrinters[index]];
+    setPrinters(newPrinters);
+  };
+
+  const addMarginTier = () => {
+    const newTier: MarginTier = {
+      id: Date.now().toString(),
+      name: 'New Tier',
+      margin: 20
+    };
+    setMarginTiers([...marginTiers, newTier]);
+  };
+
+  const updateMarginTier = (id: string, updates: Partial<MarginTier>) => {
+    setMarginTiers(marginTiers.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+
+  const deleteMarginTier = (id: string) => {
+    setMarginTiers(marginTiers.filter(m => m.id !== id));
   };
 
   return (
@@ -253,7 +358,21 @@ const App: React.FC = () => {
               <section className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                   <h2 style={{ marginBottom: 0 }}>Print Details</h2>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div className="input-group" style={{ marginBottom: 0, minWidth: '200px' }}>
+                      <select
+                        value={selectedPrinterId}
+                        onChange={(e) => setSelectedPrinterId(e.target.value)}
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}
+                      >
+                        {printers.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '1rem' }}>
                     <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Multimaterial</span>
                     <label className="toggle-switch">
                       <input
@@ -265,6 +384,7 @@ const App: React.FC = () => {
                     </label>
                   </div>
                 </div>
+              </div>
 
                 {!isMultimaterial ? (
                   <>
@@ -425,8 +545,24 @@ const App: React.FC = () => {
                   <span>{currencySymbol}{results.baseCost}</span>
                 </div>
 
-                <div className="result-item" style={{ border: 'none', marginTop: '1.5rem' }}>
-                  <span style={{ fontWeight: '600' }}>Final Price (incl. Margin)</span>
+                <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Apply Profit Margin</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                    {marginTiers.map(m => (
+                      <button 
+                        key={m.id}
+                        className={`btn ${selectedMarginId === m.id ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setSelectedMarginId(m.id)}
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                      >
+                        {m.name} ({m.margin}%)
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="result-item" style={{ border: 'none', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                  <span style={{ fontWeight: '600', fontSize: '1.1rem' }}>Final Price</span>
                   <span className="price-total">{currencySymbol}{results.finalPrice}</span>
                 </div>
               </section>
@@ -439,15 +575,6 @@ const App: React.FC = () => {
             <div className="card">
               <h2>Global Defaults</h2>
               <div className="grid-2">
-                <div className="input-group">
-                  <label><Percent size={14} style={{ marginRight: '4px' }} /> Profit Margin (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={settings.margin}
-                    onChange={(e) => setSettings({ ...settings, margin: Math.max(0, Number(e.target.value)) })}
-                  />
-                </div>
                 <div className="input-group">
                   <label><Banknote size={14} style={{ marginRight: '4px' }} /> Preferred Currency</label>
                   <select
@@ -470,15 +597,6 @@ const App: React.FC = () => {
                   />
                 </div>
                 <div className="input-group">
-                  <label><Zap size={14} style={{ marginRight: '4px' }} /> Printer Power (Watts) while printing</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={settings.wattsUsed}
-                    onChange={(e) => setSettings({ ...settings, wattsUsed: Math.max(0, Number(e.target.value)) })}
-                  />
-                </div>
-                <div className="input-group">
                   <label><Scale size={14} style={{ marginRight: '4px' }} /> Purge waste (grams per change)</label>
                   <input
                     type="number"
@@ -488,28 +606,152 @@ const App: React.FC = () => {
                     onChange={(e) => setSettings({ ...settings, purgeGramsPerChange: Math.max(0, Number(e.target.value)) })}
                   />
                 </div>
-                <div className="input-group">
-                  <label><Cpu size={14} style={{ marginRight: '4px' }} /> Machine Price ({currencySymbol}) - 4000h deprecation</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={settings.machinePrice}
-                    onChange={(e) => setSettings({ ...settings, machinePrice: Math.max(0, Number(e.target.value)) })}
-                  />
-                </div>
               </div>
             </div>
 
             <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', cursor: 'pointer' }} onClick={() => setPrintersCollapsed(!printersCollapsed)}>
+                <h2 style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {printersCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
+                  Printer Library
+                </h2>
+                <button className="btn" onClick={(e) => { e.stopPropagation(); addPrinter(); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}>
+                  <Plus size={18} /> Add Printer
+                </button>
+              </div>
+
+              {printersCollapsed ? (
+                <div style={{ color: 'var(--text-secondary)', paddingLeft: '2.5rem' }}>
+                  {printers.map(p => <div key={p.id} style={{ marginBottom: '0.5rem' }}>• {p.name}</div>)}
+                </div>
+              ) : (
+                printers.map((printer, index) => (
+                  <div id={`printer-${printer.id}`} key={printer.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid var(--border-color)', position: 'relative' }}>
+                  <div className="grid-2" style={{ marginBottom: '1rem' }}>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label>Printer Name</label>
+                      <input
+                        type="text"
+                        value={printer.name}
+                        onChange={(e) => updatePrinter(printer.id, { name: e.target.value })}
+                      />
+                    </div>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label>Price ({currencySymbol})</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={printer.price}
+                        onChange={(e) => updatePrinter(printer.id, { price: Math.max(0, Number(e.target.value)) })}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid-2" style={{ marginBottom: '1rem' }}>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label>Print Watts</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={printer.printWatts}
+                        onChange={(e) => updatePrinter(printer.id, { printWatts: Math.max(0, Number(e.target.value)) })}
+                      />
+                    </div>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label>Warmup Watts (e.g. Bed heating)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={printer.warmupWatts}
+                        onChange={(e) => updatePrinter(printer.id, { warmupWatts: Math.max(0, Number(e.target.value)) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid-2">
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label>Depreciation Life (Hours)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={printer.depreciationLife}
+                        onChange={(e) => updatePrinter(printer.id, { depreciationLife: Math.max(0, Number(e.target.value)) })}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', justifyContent: 'flex-end' }}>
+                      <button className="btn btn-secondary" onClick={() => movePrinter(index, 'up')} disabled={index === 0} style={{ padding: '0.6rem', fontSize: '1.2rem', lineHeight: '1rem' }}>↑</button>
+                      <button className="btn btn-secondary" onClick={() => movePrinter(index, 'down')} disabled={index === printers.length - 1} style={{ padding: '0.6rem', fontSize: '1.2rem', lineHeight: '1rem' }}>↓</button>
+                      <button className="btn btn-secondary" onClick={() => deletePrinter(printer.id)} style={{ padding: '0.6rem', color: '#ef4444' }}><Trash2 size={20} /></button>
+                    </div>
+                  </div>
+                </div>
+                ))
+              )}
+            </div>
+
+            <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2 style={{ marginBottom: 0 }}>Filament Library</h2>
-                <button className="btn" onClick={addFilament} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}>
+                <h2 style={{ marginBottom: 0 }}>Profit Margins</h2>
+                <button className="btn" onClick={addMarginTier} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}>
+                  <Plus size={18} /> Add Margin
+                </button>
+              </div>
+
+              {marginTiers.map(tier => (
+                <div key={tier.id} className="grid-2" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid var(--border-color)', position: 'relative' }}>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label>Margin Name</label>
+                    <input
+                      type="text"
+                      value={tier.name}
+                      onChange={(e) => updateMarginTier(tier.id, { name: e.target.value })}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label>Margin (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={tier.margin}
+                        onChange={(e) => updateMarginTier(tier.id, { margin: Math.max(0, Number(e.target.value)) })}
+                      />
+                    </div>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => deleteMarginTier(tier.id)}
+                      style={{ height: '45px', width: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: '#ef4444' }}
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', cursor: 'pointer' }} onClick={() => setFilamentsCollapsed(!filamentsCollapsed)}>
+                <h2 style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {filamentsCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
+                  Filament Library
+                </h2>
+                <button className="btn" onClick={(e) => { e.stopPropagation(); addFilament(); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}>
                   <Plus size={18} /> Add Filament
                 </button>
               </div>
 
-              {filaments.map(filament => (
-                <div key={filament.id} className="grid-2" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid var(--border-color)', position: 'relative' }}>
+              {filamentsCollapsed ? (
+                <div style={{ color: 'var(--text-secondary)', paddingLeft: '2.5rem' }}>
+                  {filaments.map(f => (
+                    <div key={f.id} style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: f.color, display: 'inline-block' }}></span>
+                      {f.name}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                filaments.map(filament => (
+                  <div id={`filament-${filament.id}`} key={filament.id} className="grid-2" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid var(--border-color)', position: 'relative' }}>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label>Name</label>
                     <input
@@ -546,7 +788,8 @@ const App: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}

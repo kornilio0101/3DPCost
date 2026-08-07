@@ -28,5 +28,5 @@ if __name__ == '__main__':
         background_color='#0d0d12'
     )
     
-    # Start the webview with GUI=None (let it pick best native)
-    webview.start()
+    # Start the webview and disable private mode to persist localStorage
+    webview.start(private_mode=False)
